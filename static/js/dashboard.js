@@ -4,15 +4,15 @@ let previousCardData = null;
 
 // View Management
 function initViewSwitching() {
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function(e) {
             e.preventDefault();
             const viewName = this.getAttribute('data-view');
             switchView(viewName);
             
-            // Update active nav link
-            navLinks.forEach(l => l.classList.remove('active'));
+            // Update active tab button
+            tabBtns.forEach(b => b.classList.remove('active'));
             this.classList.add('active');
         });
     });
@@ -59,7 +59,7 @@ function updateDeviceCount(count) {
     const countEl = document.getElementById('deviceCount');
     if (countEl) {
         const plural = count === 1 ? 'device' : 'devices';
-        countEl.innerHTML = `<strong>${count}</strong> ${plural} discovered`;
+        countEl.innerHTML = `<strong>${count}</strong> ${plural}`;
     }
 }
 
@@ -147,8 +147,8 @@ function updateDeviceTable(devices) {
     if (devices.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="empty-state">
-
+                <td colspan="8" class="empty-state">
+                    <div class="loading-spinner"></div>
                     <h3>No devices found</h3>
                     <p>Waiting for Cygnus IoT devices to appear on the network...</p>
                 </td>
@@ -162,15 +162,23 @@ function updateDeviceTable(devices) {
     
     devices.forEach(device => {
         const row = document.createElement('tr');
+        const ip = device.ip || 'N/A';
         
         row.innerHTML = `
             <td>${escapeHtml(device.hostname || 'Unknown')}</td>
-            <td>${escapeHtml(device.ip || 'N/A')}</td>
+            <td>${escapeHtml(ip)}</td>
             <td>${escapeHtml(device.port || 'N/A')}</td>
             <td>${escapeHtml(device.imei || 'N/A')}</td>
             <td>${escapeHtml(device.device_id || 'N/A')}</td>
             <td>${escapeHtml(device.model || 'N/A')}</td>
             <td>${escapeHtml(device.fw || 'N/A')}</td>
+            <td>
+                <div class="table-port-btns">
+                    <a href="http://${escapeHtml(ip)}:5001" target="_blank" class="table-port-btn table-port-btn-5001">5001</a>
+                    <a href="http://${escapeHtml(ip)}:5002" target="_blank" class="table-port-btn table-port-btn-5002">5002</a>
+                    <a href="http://${escapeHtml(ip)}:8081" target="_blank" class="table-port-btn table-port-btn-8081">8081</a>
+                </div>
+            </td>
         `;
         
         fragment.appendChild(row);
