@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cygnus IoT Device Discovery</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="logo">
+            <img src="../static/images/tor-cygnus-logo.png" alt="Cygnus Logo" style="max-width: 100%; height: auto;">
+        </div>
+        <nav>
+            <a href="#" class="nav-link active" data-view="dashboard">
+                Dashboard
+            </a>
+            <a href="#" class="nav-link" data-view="device-list">
+                Device List
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            Cygnus Device Discovery v1.0
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Dashboard View (Card-based) -->
+        <div id="dashboard-view" class="view-content active">
+            <div class="page-header">
+                <h1>
+                    Device Discovery
+                    <span class="status-badge">Live</span>
+                </h1>
+                <p>Real-time monitoring of Cygnus IoT devices on your network</p>
+                <div class="device-count" id="deviceCount">
+                    <strong>0</strong> devices discovered
+                </div>
+            </div>
+            <div id="deviceCardsContainer" class="device-grid">
+                <div class="no-devices">
+                    <h2>Scanning for devices...</h2>
+                    <p>Waiting for Cygnus IoT devices to appear on the network</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Device List View (Table-based) -->
+        <div id="device-list-view" class="view-content">
+            <div class="page-header">
+                <h1>
+                    Device List
+                    <span class="status-badge">Live</span>
+                </h1>
+                <p>Complete list of all discovered devices</p>
+            </div>
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h2>Discovered Devices</h2>
+                    <span class="refresh-info" id="refresh-info">Loading...</span>
+                </div>
+                <div class="device-table-wrapper">
+                    <table class="device-table">
+                        <thead>
+                            <tr>
+                                <th>Hostname</th>
+                                <th>IP Address</th>
+                                <th>Port</th>
+                                <th>IMEI</th>
+                                <th>Device ID</th>
+                                <th>Model</th>
+                                <th>Firmware</th>
+                            </tr>
+                        </thead>
+                        <tbody id="device-table-body">
+                            <tr>
+                                <td colspan="7" class="empty-state">
+                                    <h3>Scanning for devices...</h3>
+                                    <p>Please wait while we search for Cygnus IoT devices on the network</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
