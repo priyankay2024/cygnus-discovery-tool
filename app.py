@@ -30,16 +30,19 @@ def run_flask():
 
 if __name__ == '__main__':
     # Start mDNS discovery in background thread
+    print("Initializing mDNS discovery service...")
     discovery_thread = threading.Thread(target=start_discovery, daemon=True)
     discovery_thread.start()
     
-    # Give discovery a moment to start
-    time.sleep(1)
+    # Give discovery more time to initialize and start scanning
+    print("Waiting for discovery service to initialize...")
+    time.sleep(2)
     
     print("\n" + "="*60)
     print("Cygnus IoT Device Discovery Server")
     print("="*60)
     print("Web interface: http://localhost:5000")
+    print("mDNS discovery: Active (queries every 10s)")
     print("Press Ctrl+C to stop")
     print("="*60 + "\n")
     

@@ -29,7 +29,28 @@ IP_ADDR=$(ip route get 1 | awk '{print $7; exit}')
 # 5. Firmware version
 FW_VER=$(grep VERSION_ID /etc/os-release | cut -d= -f2 | tr -d '"')
 
-# 6. Create Avahi service file
+# 6. Get memory usage
+MEMORY_TOTAL=$(free | awk '/Mem:/ {print $2}')
+MEMORY_USED=$(free | awk '/Mem:/ {print $3}')
+MEMORY_USAGE=$(awk "BEGIN {printf \"%.1f\", ($MEMORY_USED/$MEMORY_TOTAL)*100}")
+
+# 7. Check service enabled status
+check_service_enabled() {
+    if systemctl is-enabled "$1" >/dev/null 2>&1; then
+        echo "enabled"
+    else
+        echo "disabled"
+    fi
+}
+
+BACNET_STATUS=$(check_service_enabled bacnet)
+TOR_MODBUS_STATUS=$(check_service_enabled tor-modbus)
+TOR_SERIAL2TCP_STATUS=$(check_service_enabled tor-serial2tcp)
+OPCUA_STATUS=$(check_service_enabled opcua)
+OPENPLC_STATUS=$(check_service_enabled openplc)
+CYGMIN_STATUS=$(check_service_enabled cygmin)
+
+# 8. Create Avahi service file
 cat <<EOF > /etc/avahi/services/cygnus.service
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
@@ -45,17 +66,24 @@ cat <<EOF > /etc/avahi/services/cygnus.service
     <type>_cygnus._tcp</type>
     <port>8080</port>
     <txt-record>imei=$IMEI</txt-record>
-    <txt-record>device_id=$DEVICE_ID</txt-record>
     <txt-record>hostname=$HOSTNAME</txt-record>
     <txt-record>ip=$IP_ADDR</txt-record>
-    <txt-record>fw=$FW_VER</txt-record>
     <txt-record>model=QCM2290</txt-record>
+    <txt-record>memory_usage=$MEMORY_USAGE%</txt-record>
+    <txt-record>bacnet=$BACNET_STATUS</txt-record>
+    <txt-record>tor-modbus=$TOR_MODBUS_STATUS</txt-record>
+    <txt-record>tor-serial2tcp=$TOR_SERIAL2TCP_STATUS</txt-record>
+    <txt-record>opcua=$OPCUA_STATUS</txt-record>
+    <txt-record>openplc=$OPENPLC_STATUS</txt-record>
+    <txt-record>cygmin=$CYGMIN_STATUS</txt-record>
   </service>
 </service-group>
 EOF
 
-# 7. Restart Avahi
-systemctl restart avahi-daemon
+# 9. Restart Avahi
+killall avahi-daemon 2>/dev/null || true
+sleep 2
+avahi-daemon --daemonize
 
-# 8. Disable first-boot service
+# 10. Disable first-boot service
 systemctl disable cygnus-provision.service
