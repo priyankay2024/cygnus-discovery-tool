@@ -152,54 +152,96 @@ body {
 /* Device Cards Grid */
 .device-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
 }
 
 .device-card {
     background: white;
-    border-radius: 12px;
+    border-radius: 10px;
     padding: 0;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease;
     overflow: hidden;
     border: 2px solid transparent;
+    position: relative;
 }
 
 .device-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(246, 73, 13, 0.15);
+    box-shadow: 0 6px 20px rgba(246, 73, 13, 0.15);
     border-color: var(--primary-color);
+}
+
+/* Online/Offline Status Indicator */
+.device-status-indicator {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.status-online {
+    background: var(--success);
+    color: white;
+}
+
+.status-offline {
+    background: var(--danger);
+    color: white;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 .device-card-header {
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
     color: white;
-    padding: 20px 24px;
+    padding: 16px 20px;
 }
 
 .device-card-name {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     color: white;
 }
 
 .device-card-ip {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     opacity: 0.95;
     font-family: 'Courier New', monospace;
 }
 
 .device-card-details {
-    padding: 20px 24px;
+    padding: 14px 20px;
 }
 
 .detail-row {
     display: flex;
     justify-content: space-between;
-    padding: 12px 0;
+    padding: 8px 0;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -210,7 +252,7 @@ body {
 .detail-label {
     color: var(--text-muted);
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -218,23 +260,26 @@ body {
 .detail-value {
     color: var(--text-dark);
     font-family: 'Courier New', monospace;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
 }
 
-.device-card-actions {
+/* Service Buttons */
+.device-card-services {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
-    padding: 16px 24px 20px;
+    padding: 14px 20px 18px;
     background: var(--bg-light);
 }
 
-.port-btn {
+.service-btn {
     flex: 1;
-    padding: 12px 16px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 13px;
+    min-width: calc(50% - 4px);
+    padding: 10px 12px;
+    border: 2px solid var(--primary-color);
+    border-radius: 6px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -242,42 +287,75 @@ body {
     text-align: center;
     display: inline-block;
     background: white;
-    color: var(--text-dark);
-}
-
-.port-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.port-btn-5001 {
-    border-color: var(--primary-color);
     color: var(--primary-color);
 }
 
-.port-btn-5001:hover {
+.service-btn:hover {
     background: var(--primary-color);
     color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(246, 73, 13, 0.3);
 }
 
-.port-btn-5002 {
-    border-color: var(--secondary-color);
-    color: var(--secondary-color);
+.no-services {
+    width: 100%;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+    padding: 8px;
 }
 
-.port-btn-5002:hover {
-    background: var(--secondary-color);
+/* Device Name Input */
+.device-name-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.device-name-input-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.device-name-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: border-color 0.2s ease;
+}
+
+.device-name-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.save-name-btn {
+    padding: 8px 16px;
+    background: var(--primary-color);
     color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
-.port-btn-8081 {
-    border-color: var(--success);
-    color: var(--success);
+.save-name-btn:hover:not(:disabled) {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(246, 73, 13, 0.3);
 }
 
-.port-btn-8081:hover {
-    background: var(--success);
-    color: white;
+.save-name-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .no-devices {
@@ -386,9 +464,31 @@ body {
     color: var(--text-dark);
 }
 
-.device-table td:first-child {
+.table-hostname {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-weight: 700;
     color: var(--primary-color);
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge-online {
+    background: var(--success);
+    color: white;
+}
+
+.status-badge-offline {
+    background: var(--danger);
+    color: white;
 }
 
 .device-table td:nth-child(2) {
@@ -396,14 +496,16 @@ body {
     font-weight: 600;
 }
 
-.table-port-btns {
+/* Table Service Buttons */
+.table-service-btns {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
-.table-port-btn {
+.table-service-btn {
     padding: 6px 12px;
-    border: 1.5px solid var(--border-color);
+    border: 1.5px solid var(--primary-color);
     border-radius: 6px;
     font-size: 11px;
     font-weight: 700;
@@ -412,42 +514,20 @@ body {
     text-decoration: none;
     display: inline-block;
     background: white;
-    color: var(--text-dark);
-}
-
-.table-port-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.table-port-btn-5001 {
-    border-color: var(--primary-color);
     color: var(--primary-color);
 }
 
-.table-port-btn-5001:hover {
+.table-service-btn:hover {
     background: var(--primary-color);
     color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(246, 73, 13, 0.3);
 }
 
-.table-port-btn-5002 {
-    border-color: var(--secondary-color);
-    color: var(--secondary-color);
-}
-
-.table-port-btn-5002:hover {
-    background: var(--secondary-color);
-    color: white;
-}
-
-.table-port-btn-8081 {
-    border-color: var(--success);
-    color: var(--success);
-}
-
-.table-port-btn-8081:hover {
-    background: var(--success);
-    color: white;
+.no-services-small {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
 }
 
 .empty-state {
@@ -470,7 +550,7 @@ body {
 /* Responsive Design */
 @media (max-width: 1200px) {
     .device-grid {
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
 }
 
@@ -521,19 +601,20 @@ body {
 }
 
 @media (max-width: 480px) {
-    .device-card-actions {
+    .device-card-services {
         flex-direction: column;
     }
 
-    .port-btn {
+    .service-btn {
         width: 100%;
+        min-width: 100%;
     }
 
-    .table-port-btns {
+    .table-service-btns {
         flex-direction: column;
     }
 
-    .table-port-btn {
+    .table-service-btn {
         width: 100%;
     }
 }

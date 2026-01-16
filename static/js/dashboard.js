@@ -96,10 +96,49 @@ function createDeviceCard(device) {
     const ip = device.ip || 'N/A';
     const imei = device.imei || 'N/A';
     const model = device.model || 'N/A';
-    const fw = device.fw || 'N/A';
-    const deviceId = device.device_id || 'N/A';
+    const status = device.status || 'offline';
+    const services = device.services || {};
+    const deviceName = device.device_name || '';
+    const deviceNameId = device.name || '';
+    
+    // Debug: Log services to console
+    console.log('Device:', hostname, 'Services:', services);
+    
+    // Build service buttons HTML - Cygnus Admin first
+    let serviceButtonsHTML = '';
+    
+    // Add Cygnus Admin first if it exists (even if port is null)
+    if ('Cygnus Admin' in services) {
+        serviceButtonsHTML += `
+            <a href="http://${escapeHtml(ip)}" target="_blank" class="service-btn" title="Cygnus Admin">
+                Cygnus Admin
+            </a>
+        `;
+    }
+    
+    // Then add all other services
+    for (const [serviceName, port] of Object.entries(services)) {
+        console.log('Service:', serviceName, 'Port:', port);
+        if (serviceName !== 'Cygnus Admin' && port !== null && port !== undefined) {
+            serviceButtonsHTML += `
+                <a href="http://${escapeHtml(ip)}:${port}" target="_blank" class="service-btn" title="${escapeHtml(serviceName)} - Port ${port}">
+                    ${escapeHtml(serviceName)}
+                </a>
+            `;
+        }
+    }
+    
+    // If no services are enabled, show a message
+    if (Object.keys(services).length === 0) {
+        serviceButtonsHTML = '<span class="no-services">No services enabled</span>';
+    }
+    
+    const statusIndicatorClass = status === 'online' ? 'status-online' : 'status-offline';
+    const statusText = status === 'online' ? 'Online' : 'Offline';
     
     card.innerHTML = `
+        <div class="device-status-indicator ${statusIndicatorClass}" title="${statusText}">
+            <span class="status-dot"></span>            <span>${statusText}</span>        </div>
         <div class="device-card-header">
             <div class="device-card-name">${escapeHtml(hostname)}</div>
             <div class="device-card-ip">${escapeHtml(ip)}</div>
@@ -110,32 +149,86 @@ function createDeviceCard(device) {
                 <span class="detail-value">${escapeHtml(imei)}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">Device ID:</span>
-                <span class="detail-value">${escapeHtml(deviceId)}</span>
-            </div>
-            <div class="detail-row">
                 <span class="detail-label">Model:</span>
                 <span class="detail-value">${escapeHtml(model)}</span>
             </div>
-            <div class="detail-row">
-                <span class="detail-label">Firmware:</span>
-                <span class="detail-value">${escapeHtml(fw)}</span>
+            <div class="detail-row device-name-row">
+                <span class="detail-label">Device Name:</span>
+                <div class="device-name-input-wrapper">
+                    <input type="text" class="device-name-input" value="${escapeHtml(deviceName)}" placeholder="Add name..." data-device-id="${escapeHtml(deviceNameId)}">
+                    <button class="save-name-btn" data-device-id="${escapeHtml(deviceNameId)}">Save</button>
+                </div>
             </div>
         </div>
-        <div class="device-card-actions">
-            <a href="http://${escapeHtml(ip)}:5001" target="_blank" class="port-btn port-btn-5001">
-                Port 5001
-            </a>
-            <a href="http://${escapeHtml(ip)}:5002" target="_blank" class="port-btn port-btn-5002">
-                Port 5002
-            </a>
-            <a href="http://${escapeHtml(ip)}:8081" target="_blank" class="port-btn port-btn-8081">
-                Port 8081
-            </a>
+        <div class="device-card-services">
+            ${serviceButtonsHTML}
         </div>
     `;
     
+    // Add event listener for save button
+    const saveBtn = card.querySelector('.save-name-btn');
+    const nameInput = card.querySelector('.device-name-input');
+    
+    if (saveBtn && nameInput) {
+        saveBtn.addEventListener('click', function() {
+            const deviceId = this.getAttribute('data-device-id');
+            const newName = nameInput.value.trim();
+            saveDeviceName(deviceId, newName, saveBtn);
+        });
+        
+        // Also save on Enter key
+        nameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const deviceId = this.getAttribute('data-device-id');
+                const newName = this.value.trim();
+                saveDeviceName(deviceId, newName, saveBtn);
+            }
+        });
+    }
+    
     return card;
+}
+
+function saveDeviceName(deviceId, deviceName, button) {
+    // Show loading state
+    const originalText = button.textContent;
+    button.textContent = '...';
+    button.disabled = true;
+    
+    fetch('/api/device/update-name', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name: deviceId,
+            device_name: deviceName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            button.textContent = '✓';
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+            }, 1500);
+        } else {
+            button.textContent = '✗';
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+            }, 1500);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving device name:', error);
+        button.textContent = '✗';
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.disabled = false;
+        }, 1500);
+    });
 }
 
 function updateDeviceTable(devices) {
@@ -147,7 +240,7 @@ function updateDeviceTable(devices) {
     if (devices.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="empty-state">
+                <td colspan="6" class="empty-state">
                     <div class="loading-spinner"></div>
                     <h3>No devices found</h3>
                     <p>Waiting for Cygnus IoT devices to appear on the network...</p>
@@ -163,20 +256,46 @@ function updateDeviceTable(devices) {
     devices.forEach(device => {
         const row = document.createElement('tr');
         const ip = device.ip || 'N/A';
+        const status = device.status || 'offline';
+        const services = device.services || {};
+        const deviceName = device.device_name || '-';
+        
+        // Build service buttons for table - Cygnus Admin first
+        let serviceButtonsHTML = '';
+        
+        // Add Cygnus Admin first if it exists (even if port is null)
+        if ('Cygnus Admin' in services) {
+            serviceButtonsHTML += `<a href="http://${escapeHtml(ip)}" target="_blank" class="table-service-btn" title="Cygnus Admin">Cygnus Admin</a>`;
+        }
+        
+        // Then add all other services
+        for (const [serviceName, port] of Object.entries(services)) {
+            if (serviceName !== 'Cygnus Admin' && port !== null && port !== undefined) {
+                serviceButtonsHTML += `<a href="http://${escapeHtml(ip)}:${port}" target="_blank" class="table-service-btn" title="${escapeHtml(serviceName)}">${escapeHtml(serviceName)}</a>`;
+            }
+        }
+        
+        if (serviceButtonsHTML === '') {
+            serviceButtonsHTML = '<span class="no-services-small">None</span>';
+        }
+        
+        const statusClass = status === 'online' ? 'status-badge-online' : 'status-badge-offline';
+        const statusText = status === 'online' ? 'Online' : 'Offline';
         
         row.innerHTML = `
-            <td>${escapeHtml(device.hostname || 'Unknown')}</td>
-            <td>${escapeHtml(ip)}</td>
-            <td>${escapeHtml(device.port || 'N/A')}</td>
-            <td>${escapeHtml(device.imei || 'N/A')}</td>
-            <td>${escapeHtml(device.device_id || 'N/A')}</td>
-            <td>${escapeHtml(device.model || 'N/A')}</td>
-            <td>${escapeHtml(device.fw || 'N/A')}</td>
             <td>
-                <div class="table-port-btns">
-                    <a href="http://${escapeHtml(ip)}:5001" target="_blank" class="table-port-btn table-port-btn-5001">5001</a>
-                    <a href="http://${escapeHtml(ip)}:5002" target="_blank" class="table-port-btn table-port-btn-5002">5002</a>
-                    <a href="http://${escapeHtml(ip)}:8081" target="_blank" class="table-port-btn table-port-btn-8081">8081</a>
+                <div class="table-hostname">
+                    ${escapeHtml(device.hostname || 'Unknown')}
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </div>
+            </td>
+            <td>${escapeHtml(ip)}</td>
+            <td>${escapeHtml(device.imei || 'N/A')}</td>
+            <td>${escapeHtml(device.model || 'N/A')}</td>
+            <td>${escapeHtml(deviceName)}</td>
+            <td>
+                <div class="table-service-btns">
+                    ${serviceButtonsHTML}
                 </div>
             </td>
         `;
@@ -217,6 +336,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial fetch
     fetchAndUpdateDevices();
     
-    // Auto-refresh every 5 seconds
-    setInterval(fetchAndUpdateDevices, 5000);
+    // Auto-refresh every 10 seconds
+    setInterval(fetchAndUpdateDevices, 10000);
 });

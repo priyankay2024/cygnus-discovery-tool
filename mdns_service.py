@@ -96,6 +96,13 @@ class CygnusListener(ServiceListener):
                 'device_id': txt_records.get('device_id', 'N/A'),
                 'model': txt_records.get('model', 'N/A'),
                 'fw': txt_records.get('fw', 'N/A'),
+                'memory_usage': txt_records.get('memory_usage', 'N/A'),
+                'bacnet_status': txt_records.get('bacnet', 'disabled'),
+                'tor_modbus_status': txt_records.get('tor-modbus', 'disabled'),
+                'tor_serial2tcp_status': txt_records.get('tor-serial2tcp', 'disabled'),
+                'opcua_status': txt_records.get('opcua', 'disabled'),
+                'openplc_status': txt_records.get('openplc', 'disabled'),
+                'cygmin_status': txt_records.get('cygmin', 'disabled'),
                 'last_seen': time.time()
             }
             
