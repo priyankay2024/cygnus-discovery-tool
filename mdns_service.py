@@ -12,6 +12,7 @@ from zeroconf import Zeroconf, ServiceBrowser, ServiceListener, ServiceStateChan
 _devices = {}
 _devices_lock = threading.Lock()
 _zeroconf = None
+_service_browser = None
 _service_type = "_cygnus._tcp.local."
 
 # Configuration
@@ -86,6 +87,19 @@ class CygnusListener(ServiceListener):
                     except Exception as e:
                         print(f"[mDNS] Error decoding TXT record: {e}")
             
+            # Parse dynamic services from TXT records (format: service_name:port=status)
+            services = {}
+            for key, value in txt_records.items():
+                if ':' in key and '=' not in key:  # Format: service:port
+                    parts = key.split(':')
+                    if len(parts) == 2:
+                        service_name = parts[0]
+                        try:
+                            port = int(parts[1]) if parts[1] else None
+                        except ValueError:
+                            port = None
+                        services[service_name] = {'port': port, 'status': value}
+            
             # Build device info
             device_info = {
                 'name': name,
@@ -97,12 +111,7 @@ class CygnusListener(ServiceListener):
                 'model': txt_records.get('model', 'N/A'),
                 'fw': txt_records.get('fw', 'N/A'),
                 'memory_usage': txt_records.get('memory_usage', 'N/A'),
-                'bacnet_status': txt_records.get('bacnet', 'disabled'),
-                'tor_modbus_status': txt_records.get('tor-modbus', 'disabled'),
-                'tor_serial2tcp_status': txt_records.get('tor-serial2tcp', 'disabled'),
-                'opcua_status': txt_records.get('opcua', 'disabled'),
-                'openplc_status': txt_records.get('openplc', 'disabled'),
-                'cygmin_status': txt_records.get('cygmin', 'disabled'),
+                'services': services,  # Dynamic services
                 'last_seen': time.time()
             }
             
@@ -122,19 +131,44 @@ def active_query_loop(zeroconf):
     
     while True:
         try:
-            # Force a new query for all services
-            print(f"[mDNS] Sending active query for {_service_type}...")
-            
-            # Query all cached services and refresh them
-            service_names = list(zeroconf.cache.entries_with_name(_service_type.lower()))
-            if service_names:
-                print(f"[mDNS] Found {len(service_names)} cached services, refreshing...")
-            
             time.sleep(QUERY_INTERVAL)
+            send_active_query(zeroconf)
             
         except Exception as e:
             print(f"[mDNS] Error in active query loop: {e}")
             time.sleep(5)
+
+
+def send_active_query(zeroconf):
+    """Send an active query for Cygnus devices"""
+    try:
+        print(f"[mDNS] Sending active query for {_service_type}...")
+        
+        # Get list of known devices to refresh
+        with _devices_lock:
+            device_names = list(_devices.keys())
+        
+        if device_names:
+            print(f"[mDNS] Refreshing info for {len(device_names)} known device(s)...")
+            for name in device_names:
+                try:
+                    # Query each device to refresh its info and trigger network queries
+                    info = zeroconf.get_service_info(_service_type, name, timeout=1500)
+                    if info:
+                        # Update last_seen timestamp
+                        with _devices_lock:
+                            if name in _devices:
+                                _devices[name]['last_seen'] = time.time()
+                                print(f"[mDNS] Refreshed: {name}")
+                except Exception as e:
+                    print(f"[mDNS] Could not refresh {name}: {e}")
+        else:
+            print(f"[mDNS] No known devices to refresh. ServiceBrowser will discover new devices automatically.")
+        
+        print(f"[mDNS] Active query completed")
+        
+    except Exception as e:
+        print(f"[mDNS] Error sending active query: {e}")
 
 
 def cleanup_stale_devices():
@@ -167,7 +201,7 @@ def cleanup_stale_devices():
 
 def start_discovery():
     """Start mDNS service discovery in background thread"""
-    global _zeroconf
+    global _zeroconf, _service_browser
     
     try:
         # Create Zeroconf instance with better configuration
@@ -175,7 +209,7 @@ def start_discovery():
         
         # Create listener and browser
         listener = CygnusListener(_zeroconf)
-        browser = ServiceBrowser(_zeroconf, _service_type, listener)
+        _service_browser = ServiceBrowser(_zeroconf, _service_type, listener)
         
         print(f"[mDNS] Started discovery for {_service_type}")
         print(f"[mDNS] Listening on all network interfaces")
@@ -209,3 +243,15 @@ def get_devices():
     with _devices_lock:
         # Return a copy of the device list
         return [dict(device) for device in _devices.values()]
+
+
+def force_refresh():
+    """Manually trigger an active query for devices"""
+    global _zeroconf
+    if _zeroconf:
+        print("[mDNS] Manual refresh triggered")
+        send_active_query(_zeroconf)
+        return True
+    else:
+        print("[mDNS] Cannot refresh: Zeroconf not initialized")
+        return False

@@ -6,24 +6,13 @@ from flask import Flask, render_template, jsonify, request
 import threading
 import time
 import sqlite3
-from mdns_service import start_discovery, get_devices
+from mdns_service import start_discovery, get_devices, force_refresh
 
 app = Flask(__name__)
 
 # Database configuration
 DB_PATH = 'device_data.db'
 DEVICE_TIMEOUT = 60  # seconds - mark offline if not seen
-
-# Port mapping for services
-SERVICE_PORT_MAPPING = {
-    'cygmin': None,  # No port
-    'openplc': 8080,
-    'opcua': 5002,
-    'bacnet': 5001,
-    'tor-modbus': 8081,
-    'tor-serial2tcp': 9001
-}
-
 
 def init_db():
     """Initialize SQLite database and create tables"""
@@ -42,12 +31,7 @@ def init_db():
             model TEXT,
             fw TEXT,
             memory_usage TEXT,
-            bacnet_status TEXT,
-            tor_modbus_status TEXT,
-            tor_serial2tcp_status TEXT,
-            opcua_status TEXT,
-            openplc_status TEXT,
-            cygmin_status TEXT,
+            services TEXT,
             device_name TEXT,
             status TEXT DEFAULT 'offline',
             first_seen INTEGER,
@@ -67,12 +51,14 @@ def update_device_in_db(device):
     
     try:
         current_time = int(time.time())
+        import json
+        services_json = json.dumps(device.get('services', {}))
+        
         cursor.execute('''
             INSERT INTO devicemaster 
             (name, hostname, ip, port, imei, device_id, model, fw, 
-             memory_usage, bacnet_status, tor_modbus_status, tor_serial2tcp_status,
-             opcua_status, openplc_status, cygmin_status, status, first_seen, last_seen)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?)
+             memory_usage, services, status, first_seen, last_seen)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?)
             ON CONFLICT(name) DO UPDATE SET
                 hostname = excluded.hostname,
                 ip = excluded.ip,
@@ -82,12 +68,7 @@ def update_device_in_db(device):
                 model = excluded.model,
                 fw = excluded.fw,
                 memory_usage = excluded.memory_usage,
-                bacnet_status = excluded.bacnet_status,
-                tor_modbus_status = excluded.tor_modbus_status,
-                tor_serial2tcp_status = excluded.tor_serial2tcp_status,
-                opcua_status = excluded.opcua_status,
-                openplc_status = excluded.openplc_status,
-                cygmin_status = excluded.cygmin_status,
+                services = excluded.services,
                 status = 'online',
                 last_seen = excluded.last_seen
         ''', (
@@ -100,12 +81,7 @@ def update_device_in_db(device):
             device.get('model'),
             device.get('fw'),
             device.get('memory_usage'),
-            device.get('bacnet_status'),
-            device.get('tor_modbus_status'),
-            device.get('tor_serial2tcp_status'),
-            device.get('opcua_status'),
-            device.get('openplc_status'),
-            device.get('cygmin_status'),
+            services_json,
             current_time,
             current_time
         ))
@@ -181,22 +157,30 @@ def api_devices():
     # Get all devices from database (includes online/offline status)
     device_list = get_devices_from_db()
     
-    # Add port mapping info to each device
+    # Parse services JSON for each device
+    import json
     for device in device_list:
-        device['services'] = {}
-        
-        # Map each service to its port if enabled
-        if device.get('bacnet_status') == 'enabled':
-            device['services']['BACnet'] = SERVICE_PORT_MAPPING['bacnet']
-        if device.get('tor_modbus_status') == 'enabled':
-            device['services']['Modbus'] = SERVICE_PORT_MAPPING['tor-modbus']
-        if device.get('tor_serial2tcp_status') == 'enabled':
-            device['services']['Serial2TCP'] = SERVICE_PORT_MAPPING['tor-serial2tcp']
-        if device.get('opcua_status') == 'enabled':
-            device['services']['OPC UA'] = SERVICE_PORT_MAPPING['opcua']
-        if device.get('openplc_status') == 'enabled':
-            device['services']['OpenPLC'] = SERVICE_PORT_MAPPING['openplc']
-        device['services']['Cygnus Admin'] = SERVICE_PORT_MAPPING['cygmin']
+        try:
+            services_json = device.get('services', '{}')
+            if isinstance(services_json, str):
+                services = json.loads(services_json)
+            else:
+                services = services_json
+            
+            # Convert services dict to proper format {service_name: port}
+            formatted_services = {}
+            for service_name, service_data in services.items():
+                if isinstance(service_data, dict):
+                    if service_data.get('status') == 'enabled':
+                        formatted_services[service_name] = service_data.get('port')
+                else:
+                    # Fallback for old format
+                    formatted_services[service_name] = service_data
+            
+            device['services'] = formatted_services
+        except Exception as e:
+            print(f"[API] Error parsing services for device {device.get('name')}: {e}")
+            device['services'] = {}
     
     return jsonify(device_list)
 
@@ -229,6 +213,48 @@ def update_device_name():
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         conn.close()
+
+
+@app.route('/api/device/delete', methods=['POST'])
+def delete_device():
+    """API endpoint to delete a device from database"""
+    data = request.get_json()
+    
+    device_name_id = data.get('name')  # This is the unique device identifier
+    
+    if not device_name_id:
+        return jsonify({'success': False, 'error': 'Device name ID required'}), 400
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('DELETE FROM devicemaster WHERE name = ?', (device_name_id,))
+        conn.commit()
+        
+        if cursor.rowcount > 0:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Device not found'}), 404
+    except Exception as e:
+        print(f"[DB] Error deleting device: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/refresh', methods=['POST'])
+def api_refresh():
+    """API endpoint to manually trigger mDNS query"""
+    try:
+        success = force_refresh()
+        if success:
+            return jsonify({'success': True, 'message': 'Active query sent for _cygnus._tcp.local.'})
+        else:
+            return jsonify({'success': False, 'error': 'mDNS service not initialized'}), 503
+    except Exception as e:
+        print(f"[API] Error triggering refresh: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 def run_flask():

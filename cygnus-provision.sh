@@ -70,11 +70,11 @@ cat <<EOF > /etc/avahi/services/cygnus.service
     <txt-record>ip=$IP_ADDR</txt-record>
     <txt-record>model=QCM2290</txt-record>
     <txt-record>memory_usage=$MEMORY_USAGE%</txt-record>
-    <txt-record>bacnet=$BACNET_STATUS</txt-record>
-    <txt-record>tor-modbus=$TOR_MODBUS_STATUS</txt-record>
-    <txt-record>tor-serial2tcp=$TOR_SERIAL2TCP_STATUS</txt-record>
-    <txt-record>opcua=$OPCUA_STATUS</txt-record>
-    <txt-record>openplc=$OPENPLC_STATUS</txt-record>
+    <txt-record>bacnet:5001=$BACNET_STATUS</txt-record>
+    <txt-record>tor-modbus:8081=$TOR_MODBUS_STATUS</txt-record>
+    <txt-record>tor-serial2tcp:9001=$TOR_SERIAL2TCP_STATUS</txt-record>
+    <txt-record>opcua:5002=$OPCUA_STATUS</txt-record>
+    <txt-record>openplc:8080=$OPENPLC_STATUS</txt-record>
     <txt-record>cygmin=$CYGMIN_STATUS</txt-record>
   </service>
 </service-group>
