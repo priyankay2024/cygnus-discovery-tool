@@ -21,12 +21,11 @@ def init_db():
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS devicemaster (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
+            imei TEXT PRIMARY KEY NOT NULL,
+            name TEXT,
             hostname TEXT,
             ip TEXT,
             port INTEGER,
-            imei TEXT,
             device_id TEXT,
             model TEXT,
             fw TEXT,
@@ -45,25 +44,36 @@ def init_db():
 
 
 def update_device_in_db(device):
-    """Update or insert device data in database"""
+    """Update or insert device data in database based on IMEI"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
+        # Skip devices without IMEI
+        imei = device.get('imei')
+        if not imei:
+            print(f"[DB] Skipping device without IMEI: {device.get('name', 'Unknown')}")
+            return
+        
         current_time = int(time.time())
         import json
         services_json = json.dumps(device.get('services', {}))
         
+        # Check if device exists
+        cursor.execute('SELECT first_seen FROM devicemaster WHERE imei = ?', (imei,))
+        existing = cursor.fetchone()
+        first_seen_time = existing[0] if existing else current_time
+        
         cursor.execute('''
             INSERT INTO devicemaster 
-            (name, hostname, ip, port, imei, device_id, model, fw, 
+            (imei, name, hostname, ip, port, device_id, model, fw, 
              memory_usage, services, status, first_seen, last_seen)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', ?, ?)
-            ON CONFLICT(name) DO UPDATE SET
+            ON CONFLICT(imei) DO UPDATE SET
+                name = excluded.name,
                 hostname = excluded.hostname,
                 ip = excluded.ip,
                 port = excluded.port,
-                imei = excluded.imei,
                 device_id = excluded.device_id,
                 model = excluded.model,
                 fw = excluded.fw,
@@ -72,21 +82,25 @@ def update_device_in_db(device):
                 status = 'online',
                 last_seen = excluded.last_seen
         ''', (
+            imei,
             device.get('name'),
             device.get('hostname'),
             device.get('ip'),
             device.get('port'),
-            device.get('imei'),
             device.get('device_id'),
             device.get('model'),
             device.get('fw'),
             device.get('memory_usage'),
             services_json,
-            current_time,
+            first_seen_time,
             current_time
         ))
         
         conn.commit()
+        if existing:
+            print(f"[DB] Updated device with IMEI: {imei}")
+        else:
+            print(f"[DB] Added new device with IMEI: {imei}")
     except Exception as e:
         print(f"[DB] Error updating device: {e}")
     finally:
@@ -190,11 +204,11 @@ def update_device_name():
     """API endpoint to update device name"""
     data = request.get_json()
     
-    device_name_id = data.get('name')  # This is the unique device identifier
+    device_imei = data.get('imei')  # Use IMEI as the unique identifier
     new_name = data.get('device_name', '').strip()
     
-    if not device_name_id:
-        return jsonify({'success': False, 'error': 'Device name ID required'}), 400
+    if not device_imei:
+        return jsonify({'success': False, 'error': 'Device IMEI required'}), 400
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -203,8 +217,8 @@ def update_device_name():
         cursor.execute('''
             UPDATE devicemaster 
             SET device_name = ?
-            WHERE name = ?
-        ''', (new_name, device_name_id))
+            WHERE imei = ?
+        ''', (new_name, device_imei))
         
         conn.commit()
         return jsonify({'success': True})
@@ -220,16 +234,16 @@ def delete_device():
     """API endpoint to delete a device from database"""
     data = request.get_json()
     
-    device_name_id = data.get('name')  # This is the unique device identifier
+    device_imei = data.get('imei')  # Use IMEI as the unique identifier
     
-    if not device_name_id:
-        return jsonify({'success': False, 'error': 'Device name ID required'}), 400
+    if not device_imei:
+        return jsonify({'success': False, 'error': 'Device IMEI required'}), 400
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        cursor.execute('DELETE FROM devicemaster WHERE name = ?', (device_name_id,))
+        cursor.execute('DELETE FROM devicemaster WHERE imei = ?', (device_imei,))
         conn.commit()
         
         if cursor.rowcount > 0:

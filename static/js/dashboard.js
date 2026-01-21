@@ -177,7 +177,7 @@ function createDeviceCard(device) {
     return card;
 }
 
-function saveDeviceName(deviceId, deviceName, button) {
+function saveDeviceName(deviceImei, deviceName, button) {
     // Show loading state
     const originalText = button.textContent;
     button.textContent = '...';
@@ -189,7 +189,7 @@ function saveDeviceName(deviceId, deviceName, button) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            name: deviceId,
+            imei: deviceImei,
             device_name: deviceName
         })
     })
@@ -249,7 +249,7 @@ function updateDeviceTable(devices) {
         const status = device.status || 'offline';
         const services = device.services || {};
         const deviceName = device.device_name || '-';
-        const deviceNameId = device.name || '';
+        const deviceImei = device.imei || '';
         
         // Build service buttons for table
         let serviceButtonsHTML = '';
@@ -277,8 +277,8 @@ function updateDeviceTable(devices) {
             <td>${escapeHtml(device.imei || 'N/A')}</td>
             <td>${escapeHtml(device.model || 'N/A')}</td>
             <td>
-                <span class="device-name-display" data-device-id="${escapeHtml(deviceNameId)}">${escapeHtml(deviceName)}</span>
-                <input type="text" class="device-name-edit" data-device-id="${escapeHtml(deviceNameId)}" value="${escapeHtml(deviceName)}" style="display:none;">
+                <span class="device-name-display" data-device-imei="${escapeHtml(deviceImei)}">${escapeHtml(deviceName)}</span>
+                <input type="text" class="device-name-edit" data-device-imei="${escapeHtml(deviceImei)}" value="${escapeHtml(deviceName)}" style="display:none;">
             </td>
             <td>
                 <div class="table-service-btns">
@@ -287,13 +287,13 @@ function updateDeviceTable(devices) {
             </td>
             <td>
                 <div class="action-btns">
-                    <button class="action-btn edit-btn" data-device-id="${escapeHtml(deviceNameId)}" title="Edit device name">
+                    <button class="action-btn edit-btn" data-device-imei="${escapeHtml(deviceImei)}" title="Edit device name">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                     </button>
-                    <button class="action-btn delete-btn" data-device-id="${escapeHtml(deviceNameId)}" title="Delete device">
+                    <button class="action-btn delete-btn" data-device-imei="${escapeHtml(deviceImei)}" title="Delete device">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -318,7 +318,7 @@ function attachActionListeners() {
     // Edit buttons
     document.querySelectorAll('.edit-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            const deviceId = this.getAttribute('data-device-id');
+            const deviceImei = this.getAttribute('data-device-imei');
             const row = this.closest('tr');
             const displaySpan = row.querySelector('.device-name-display');
             const editInput = row.querySelector('.device-name-edit');
@@ -337,7 +337,7 @@ function attachActionListeners() {
             } else {
                 // Save mode
                 const newName = editInput.value.trim();
-                saveDeviceNameInline(deviceId, newName, displaySpan, editInput, this);
+                saveDeviceNameInline(deviceImei, newName, displaySpan, editInput, this);
             }
         });
     });
@@ -345,9 +345,9 @@ function attachActionListeners() {
     // Delete buttons
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            const deviceId = this.getAttribute('data-device-id');
+            const deviceImei = this.getAttribute('data-device-imei');
             if (confirm('Are you sure you want to delete this device?')) {
-                deleteDevice(deviceId);
+                deleteDevice(deviceImei);
             }
         });
     });
@@ -356,7 +356,7 @@ function attachActionListeners() {
     document.querySelectorAll('.device-name-edit').forEach(input => {
         input.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                const deviceId = this.getAttribute('data-device-id');
+                const deviceImei = this.getAttribute('data-device-imei');
                 const row = this.closest('tr');
                 const editBtn = row.querySelector('.edit-btn');
                 editBtn.click();
@@ -365,7 +365,7 @@ function attachActionListeners() {
     });
 }
 
-function saveDeviceNameInline(deviceId, deviceName, displaySpan, editInput, button) {
+function saveDeviceNameInline(deviceImei, deviceName, displaySpan, editInput, button) {
     const originalIcon = button.innerHTML;
     button.innerHTML = '...';
     button.disabled = true;
@@ -376,7 +376,7 @@ function saveDeviceNameInline(deviceId, deviceName, displaySpan, editInput, butt
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            name: deviceId,
+            imei: deviceImei,
             device_name: deviceName
         })
     })
@@ -411,14 +411,14 @@ function saveDeviceNameInline(deviceId, deviceName, displaySpan, editInput, butt
     });
 }
 
-function deleteDevice(deviceId) {
+function deleteDevice(deviceImei) {
     fetch('/api/device/delete', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            name: deviceId
+            imei: deviceImei
         })
     })
     .then(response => response.json())

@@ -14,13 +14,20 @@ fi
 DEVICE_ID=$(echo "$IMEI" | tail -c 7)
 HOSTNAME="cygnus-$DEVICE_ID"
 
-# 3. Set hostname (Yocto-safe way)
-echo "$HOSTNAME" > /proc/sys/kernel/hostname
-echo "$HOSTNAME" > /etc/hostname
-
-# Optional: update hosts
-sed -i "/127.0.1.1/d" /etc/hosts
-echo "127.0.1.1 $HOSTNAME" >> /etc/hosts
+# 3. Check current hostname and only update if it's qcm2290
+CURRENT_HOSTNAME=$(cat /etc/hostname | tr -d '[:space:]')
+if [ "$CURRENT_HOSTNAME" = "qcm2290" ]; then
+    # Set hostname (Yocto-safe way)
+    echo "$HOSTNAME" > /proc/sys/kernel/hostname
+    echo "$HOSTNAME" > /etc/hostname
+    
+    # Optional: update hosts
+    sed -i "/127.0.1.1/d" /etc/hosts
+    echo "127.0.1.1 $HOSTNAME" >> /etc/hosts
+else
+    # Use existing hostname instead of generating new one
+    HOSTNAME="$CURRENT_HOSTNAME"
+fi
 
 # 4. Get IP address
 IP_ADDR=$(ip route get 1 | awk '{print $7; exit}')
@@ -34,7 +41,11 @@ MEMORY_TOTAL=$(free | awk '/Mem:/ {print $2}')
 MEMORY_USED=$(free | awk '/Mem:/ {print $3}')
 MEMORY_USAGE=$(awk "BEGIN {printf \"%.1f\", ($MEMORY_USED/$MEMORY_TOTAL)*100}")
 
-# 7. Check service enabled status
+# 7. Read services from cygnus-protocol-services.conf
+CONFIG_FILE="/etc/cygnus-protocol-services.conf"
+[ ! -f "$CONFIG_FILE" ] && CONFIG_FILE="/usr/local/etc/cygnus-protocol-services.conf"
+
+# Function to check service enabled status
 check_service_enabled() {
     if systemctl is-enabled "$1" >/dev/null 2>&1; then
         echo "enabled"
@@ -43,12 +54,25 @@ check_service_enabled() {
     fi
 }
 
-BACNET_STATUS=$(check_service_enabled bacnet)
-TOR_MODBUS_STATUS=$(check_service_enabled tor-modbus)
-TOR_SERIAL2TCP_STATUS=$(check_service_enabled tor-serial2tcp)
-OPCUA_STATUS=$(check_service_enabled opcua)
-OPENPLC_STATUS=$(check_service_enabled openplc)
-CYGMIN_STATUS=$(check_service_enabled cygmin)
+# Extract unique service names and their ports from config file
+SERVICE_RECORDS=""
+if [ -f "$CONFIG_FILE" ]; then
+    # Get unique service names from config
+    SERVICES=$(grep "\.port=" "$CONFIG_FILE" | cut -d'.' -f1 | sort -u)
+    
+    for service in $SERVICES; do
+        # Get port for this service
+        PORT=$(grep "^${service}\.port=" "$CONFIG_FILE" | cut -d'=' -f2)
+        STATUS=$(check_service_enabled "$service")
+        
+        # Build txt-record entry
+        if [ -n "$PORT" ] && [ "$PORT" != "" ]; then
+            SERVICE_RECORDS="${SERVICE_RECORDS}    <txt-record>${service}:${PORT}=${STATUS}</txt-record>\n"
+        fi
+    done
+fi
+
+CYGMIN_STATUS=$(check_service_enabled "cygmin")
 
 # 8. Create Avahi service file
 cat <<EOF > /etc/avahi/services/cygnus.service
@@ -70,12 +94,8 @@ cat <<EOF > /etc/avahi/services/cygnus.service
     <txt-record>ip=$IP_ADDR</txt-record>
     <txt-record>model=QCM2290</txt-record>
     <txt-record>memory_usage=$MEMORY_USAGE%</txt-record>
-    <txt-record>bacnet:5001=$BACNET_STATUS</txt-record>
-    <txt-record>tor-modbus:8081=$TOR_MODBUS_STATUS</txt-record>
-    <txt-record>tor-serial2tcp:9001=$TOR_SERIAL2TCP_STATUS</txt-record>
-    <txt-record>opcua:5002=$OPCUA_STATUS</txt-record>
-    <txt-record>openplc:8080=$OPENPLC_STATUS</txt-record>
     <txt-record>cygmin=$CYGMIN_STATUS</txt-record>
+$(printf "$SERVICE_RECORDS")
   </service>
 </service-group>
 EOF
