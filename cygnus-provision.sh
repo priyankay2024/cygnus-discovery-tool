@@ -15,11 +15,12 @@ DEVICE_ID=$(echo "$IMEI" | tail -c 7)
 HOSTNAME="cygnus-$DEVICE_ID"
 
 # 3. Check current hostname and only update if it's qcm2290
-CURRENT_HOSTNAME=$(cat /etc/hostname | tr -d '[:space:]')
+CURRENT_HOSTNAME=$(hostname | tr -d '[:space:]')
 if [ "$CURRENT_HOSTNAME" = "qcm2290" ]; then
     # Set hostname (Yocto-safe way)
     echo "$HOSTNAME" > /proc/sys/kernel/hostname
     echo "$HOSTNAME" > /etc/hostname
+    hostname $(cat /etc/hostname)
     
     # Optional: update hosts
     sed -i "/127.0.1.1/d" /etc/hosts
@@ -105,5 +106,3 @@ killall avahi-daemon 2>/dev/null || true
 sleep 2
 avahi-daemon --daemonize
 
-# 10. Disable first-boot service
-systemctl disable cygnus-provision.service
