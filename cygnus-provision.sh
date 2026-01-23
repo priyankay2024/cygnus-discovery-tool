@@ -30,19 +30,15 @@ else
     HOSTNAME="$CURRENT_HOSTNAME"
 fi
 
-# 4. Get IP address
-IP_ADDR=$(ip route get 1 | awk '{print $7; exit}')
-[ -z "$IP_ADDR" ] && IP_ADDR="0.0.0.0"
-
-# 5. Firmware version
+# 4. Firmware version
 FW_VER=$(grep VERSION_ID /etc/os-release | cut -d= -f2 | tr -d '"')
 
-# 6. Get memory usage
+# 5. Get memory usage
 MEMORY_TOTAL=$(free | awk '/Mem:/ {print $2}')
 MEMORY_USED=$(free | awk '/Mem:/ {print $3}')
 MEMORY_USAGE=$(awk "BEGIN {printf \"%.1f\", ($MEMORY_USED/$MEMORY_TOTAL)*100}")
 
-# 7. Read services from cygnus-protocol-services.conf
+# 6. Read services from cygnus-protocol-services.conf
 CONFIG_FILE="/etc/cygnus-protocol-services.conf"
 [ ! -f "$CONFIG_FILE" ] && CONFIG_FILE="/usr/local/etc/cygnus-protocol-services.conf"
 
@@ -75,7 +71,7 @@ fi
 
 CYGMIN_STATUS=$(check_service_enabled "cygmin")
 
-# 8. Create Avahi service file
+# 7. Create Avahi service file
 cat <<EOF > /etc/avahi/services/cygnus.service
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
@@ -92,7 +88,6 @@ cat <<EOF > /etc/avahi/services/cygnus.service
     <port>8080</port>
     <txt-record>imei=$IMEI</txt-record>
     <txt-record>hostname=$HOSTNAME</txt-record>
-    <txt-record>ip=$IP_ADDR</txt-record>
     <txt-record>model=QCM2290</txt-record>
     <txt-record>memory_usage=$MEMORY_USAGE%</txt-record>
     <txt-record>cygmin=$CYGMIN_STATUS</txt-record>
@@ -101,7 +96,7 @@ $(printf "$SERVICE_RECORDS")
 </service-group>
 EOF
 
-# 9. Restart Avahi
+# 8. Restart Avahi
 killall avahi-daemon 2>/dev/null || true
 sleep 2
 avahi-daemon --daemonize
